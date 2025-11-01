@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>郭沛勳線上USB</title>
+<style>
+  body {
+    background: radial-gradient(circle at top, #101820, #0a0a0a);
+    color: #00ffcc;
+    font-family: 'Segoe UI', sans-serif;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #00ffcc;
+  }
+  #upload-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #00ffcc;
+    color: #000;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  #file-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .item {
+    background: rgba(0,255,204,0.1);
+    border: 1px solid #00ffcc;
+    padding: 10px 15px;
+    border-radius: 8px;
+    width: 60%;
+    max-width: 600px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s;
+  }
+  .item:hover {
+    background: rgba(0,255,204,0.3);
+    transform: scale(1.02);
+  }
+  .empty {
+    color: #888;
+    margin-top: 50px;
+  }
+</style>
+</head>
+<body>
+  <h1>郭沛勳線上USB</h1>
+  <button id="upload-btn">上傳檔案</button>
+  <input type="file" id="file-input" style="display:none" />
+  <div id="file-list">載入中...</div>
+
+  <script>
+    const repoUser = 'peterkuo0108';
+    const repoName = 'usb';
+    const branch = 'main';
+
+    async function loadFiles() {
+      const params = new URLSearchParams(window.location.search);
+      const folder = params.get('folder') || '';
+      const listElement = document.getElementById('file-list');
+
+      try {
+        const apiUrl = `https://api.github.com/repos/${repoUser}/${repoName}/contents/${folder}?ref=${branch}`;
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error('無法取得資料');
+        const data = await response.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          listElement.innerHTML = '<div class="empty">這個資料夾裡沒有檔案。</div>';
+          return;
+        }
+
+        listElement.innerHTML = '';
+        for (const itemData of data) {
+          const item = document.createElement('div');
+          item.className = 'item';
+
+          const link = document.createElement('a');
+          link.textContent = itemData.name;
+
+          if (itemData.type === 'dir') {
+            link.href = `?folder=${itemData.path}`;
+          } else {
+            link.href = itemData.download_url;
+            link.target = '_blank';
+          }
+
+          const actions = document.createElement('div');
+          if (itemData.type === 'file') {
+            if (itemData.name.includes('858585') && itemData.name.endsWith('.txt')) {
+              const openLinkBtn = document.createElement('a');
+              openLinkBtn.textContent = '開啟連結';
+              openLinkBtn.href = '#';
+              openLinkBtn.style.marginLeft = '15px';
+              openLinkBtn.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                  const res = await fetch(itemData.download_url);
+                  const content = await res.text();
+                  const urls = content.match(/https?:\/\/[^\s]+/g);
+                  if (urls && urls.length > 0) {
+                    window.open(urls[0], '_blank');
+                  } else {
+                    alert('此檔案中未找到連結');
+                  }
+                } catch (err) {
+                  alert('無法讀取檔案內容');
+                }
+              };
+              actions.appendChild(openLinkBtn);
+            }
+
+            const dl = document.createElement('a');
+            dl.textContent = '下載';
+            dl.href = itemData.download_url;
+            dl.download = itemData.name;
+            dl.style.marginLeft = '15px';
+            actions.appendChild(dl);
+          }
+
+          item.appendChild(link);
+          item.appendChild(actions);
+          listElement.appendChild(item);
+        }
+      } catch (error) {
+        listElement.innerHTML = '<div class="empty">無法載入檔案列表。</div>';
+      }
+    }
+
+    async function uploadFile(file) {
+      const params = new URLSearchParams(window.location.search);
+      const folder = params.get('folder') || '';
+      const path = folder ? `${folder}/${file.name}` : file.name;
+
+      const reader = new FileReader();
+      reader.onload = async function() {
+        const content = reader.result.split(',')[1];
+        const token = prompt('請輸入你的 GitHub Token（repo 權限）');
+        if (!token) return alert('未提供 token');
+
+        const res = await fetch(`https://api.github.com/repos/${repoUser}/${repoName}/contents/${path}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `token ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: `Upload ${file.name}`,
+            content: content,
+            branch: branch
+          })
+        });
+
+        if (res.ok) {
+          alert('上傳成功！');
+          loadFiles();
+        } else {
+          alert('上傳失敗');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('upload-btn').onclick = () => {
+      document.getElementById('file-input').click();
+    };
+
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) uploadFile(file);
+    });
+
+    loadFiles();
+  </script>
+</body>
+</html>
