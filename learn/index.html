@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學習歷程記錄器</title>
+    
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 載入 PDF 匯出工具 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- 載入 Font Awesome (圖示) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- PWA Manifest (內嵌) -->
+    <link rel="manifest" href="data:application/json;base64,ew0KICAibmFtZSI6ICLlrabkvb/mgLvnp5YiLA0KICAic2hvcnRfbmFtZSI6ICLlrabkvb8iLA0KICAic3RhcnRfdXJsIjogIi4iLA0KICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwNCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIsDQogICJ0aGVtZV9jb2xvciI6ICIjM2I4MmY2IiwNCiAgImljb25zIjogWw0KICAgIHsNCiAgICAgICJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vMTkycDE5Mi8zQjgyRjYvRkZGRkZGP3RleHQ9TG9nIiwNCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIsDQogICAgICAic2l6ZXMiOiAiMTkyeDE5MiINCiAgICB9LA0KICAgIHsNCiAgICAgICJzcmMiOiAiaHR0cHM6Ly9wbGFjZWhvbGQuY28vNTEyeDUxMi8zQjgyRjYvRkZGRkZGP3RleHQ9TG9nIiwNCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIsDQogICAgICAic2l6ZXMiOiAiNTEyeDUxMiINCiAgICB9DQogIF0NCn0=">
+
+    <style>
+        /* 自訂CSS變數以實現主題功能 */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --color-primary: #3b82f6;
+            --color-primary-hover: #2563eb;
+            --color-primary-text: #ffffff;
+            --border-color: #d1d5db;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* 將CSS變數應用到Tailwind類別中 (透過自訂類別) */
+        .bg-primary { background-color: var(--bg-primary); }
+        .bg-secondary { background-color: var(--bg-secondary); }
+        .text-primary { color: var(--text-primary); }
+        .text-secondary { color: var(--text-secondary); }
+        .text-primary-color { color: var(--color-primary); }
+        .bg-primary-color { background-color: var(--color-primary); }
+        .hover-bg-primary-hover:hover { background-color: var(--color-primary-hover); }
+        .text-primary-color-text { color: var(--color-primary-text); }
+        .border-color { border-color: var(--border-color); }
+        .shadow-custom { box-shadow: 0 4px 6px -1px var(--shadow-color), 0 2px 4px -1px var(--shadow-color); }
+
+        /* 頁面切換 */
+        .page {
+            display: none; /* 預設隱藏 */
+        }
+        .page.active {
+            display: block; /* 顯示當前頁面 */
+        }
+
+        /* 隱藏的滾動條 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none; /* Firefox */
+        }
+
+        /* 時間軸樣式 */
+        .timeline-item {
+            position: relative;
+            padding-left: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-left: 2px solid var(--color-primary);
+        }
+        .timeline-item:last-child {
+            border-left: 2px solid transparent;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -0.6rem;
+            top: 0.25rem;
+            width: 1.125rem;
+            height: 1.125rem;
+            border-radius: 9999px;
+            background-color: var(--color-primary);
+            border: 2px solid var(--bg-primary);
+        }
+        
+        /* 用於PDF匯出的列印區域 */
+        #pdf-render-area {
+            position: absolute;
+            left: -9999px; /* 移出畫面外 */
+            width: 800px;
+            padding: 2rem;
+            background: white;
+            color: black;
+        }
+    </style>
+</head>
+
+<body class="bg-secondary text-primary font-sans">
+
+    <!-- 
+      主應用程式容器
+      在平板和桌機上，最大寬度為 4xl (900px)，並置中
+      在手機上，它會佔滿整個高度
+      h-screen 和 md:h-auto 確保在手機上是全螢幕，在桌機上自適應高度
+      md:max-h-[90vh] 讓它在桌機上有個最大高度，並可以滾動
+    -->
+    <div id="app" class="max-w-4xl mx-auto h-screen md:h-auto md:max-h-[95vh] md:my-4 flex flex-col bg-primary shadow-custom md:rounded-lg overflow-hidden">
+
+        <!-- 
+          主要內容區域
+          flex-grow 讓它填滿除了導覽列之外的所有空間
+          overflow-y-auto 讓內容區域在需要時可以滾動
+        -->
+        <main id="main-content" class="flex-grow overflow-y-auto no-scrollbar p-4 md:p-6">
+            
+            <!-- 頁面 1: 新增 -->
+            <div id="page-add" class="page active">
+                <h1 class="text-2xl font-bold mb-6 text-primary-color">新增學習歷程</h1>
+                <form id="add-form" class="space-y-4">
+                    <div>
+                        <label for="log-date" class="block text-sm font-medium text-secondary">時間</label>
+                        <input type="date" id="log-date" name="log-date" required class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                    </div>
+                    <div>
+                        <label for="log-location" class="block text-sm font-medium text-secondary">地點 (選填)</label>
+                        <input type="text" id="log-location" name="log-location" class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                    </div>
+                    <div>
+                        <label for="log-topic" class="block text-sm font-medium text-secondary">主題</label>
+                        <input type="text" id="log-topic" name="log-topic" required class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                    </div>
+                    <div>
+                        <label for="log-content" class="block text-sm font-medium text-secondary">內容</label>
+                        <textarea id="log-content" name="log-content" rows="5" required class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"></textarea>
+                    </div>
+                    <div>
+                        <label for="log-category-select" class="block text-sm font-medium text-secondary">分類</label>
+                        <select id="log-category-select" name="log-category-select" class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                            <option value="">-- 選擇分類 --</option>
+                        </select>
+                        <input type="text" id="log-category-new" name="log-category-new" placeholder="或輸入新分類..." class="mt-2 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                    </div>
+                    <div>
+                        <label for="log-attachments" class="block text-sm font-medium text-secondary">附件 (圖片或其他檔案)</label>
+                        <input type="file" id="log-attachments" name="log-attachments" multiple class="mt-1 block w-full text-sm text-secondary
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-md file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-[var(--color-primary)] file:text-[var(--color-primary-text)]
+                          hover:file:bg-[var(--color-primary-hover)]">
+                    </div>
+                    <button type="submit" class="w-full bg-primary-color text-primary-color-text py-3 px-4 rounded-lg font-semibold shadow-custom hover-bg-primary-hover transition-colors">
+                        <i class="fas fa-plus mr-2"></i>新增
+                    </button>
+                </form>
+            </div>
+
+            <!-- 頁面 2: 記錄 -->
+            <div id="page-records" class="page">
+                <div class="flex justify-between items-center mb-4">
+                    <h1 class="text-2xl font-bold text-primary-color">學習記錄</h1>
+                    <button id="refresh-records" class="text-secondary hover:text-primary-color">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <!-- 記錄將會被動態插入到這裡 -->
+                <div id="records-list" class="space-y-4">
+                    <p class="text-secondary">目前沒有記錄。</p>
+                </div>
+            </div>
+
+            <!-- 頁面 3: 更多 -->
+            <div id="page-more" class="page">
+                <h1 class="text-2xl font-bold mb-6 text-primary-color">更多選項</h1>
+                <div class="space-y-6">
+                    <!-- 資料管理 -->
+                    <section>
+                        <h2 class="text-lg font-semibold mb-3">資料管理</h2>
+                        <div class="flex space-x-2">
+                            <button id="import-data-btn" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"><i class="fas fa-upload mr-2"></i>匯入資料</button>
+                            <button id="export-data-btn" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"><i class="fas fa-download mr-2"></i>匯出資料</button>
+                        </div>
+                        <div class="mt-2 text-sm text-secondary hidden" id="import-options">
+                            <input type="file" id="import-file-input" class="hidden">
+                            <p class="mb-2">匯入模式：</p>
+                            <label class="inline-flex items-center mr-4">
+                                <input type="radio" name="import-mode" value="merge" checked class="form-radio text-[var(--color-primary)]">
+                                <span class="ml-2">重疊 (新增)</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="import-mode" value="overwrite" class="form-radio text-[var(--color-primary)]">
+                                <span class="ml-2">覆蓋 (清空)</span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <!-- 分類管理 -->
+                    <section>
+                        <h2 class="text-lg font-semibold mb-3">分類管理</h2>
+                        <div id="category-manager-list" class="space-y-2">
+                            <!-- 分類列表將動態載入 -->
+                        </div>
+                    </section>
+                    
+                    <!-- 記錄頁格式 -->
+                    <section>
+                        <h2 class="text-lg font-semibold mb-3">記錄頁格式</h2>
+                        <div class="flex space-x-2" id="view-format-options">
+                            <button data-format="list" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors view-format-btn active"><i class="fas fa-list mr-2"></i>條列式</button>
+                            <button data-format="timeline" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors view-format-btn"><i class="fas fa-stream mr-2"></i>時間軸</button>
+                            <button data-format="category" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors view-format-btn"><i class="fas fa-tags mr-2"></i>分類</button>
+                        </div>
+                    </section>
+
+                    <!-- 風格主題 -->
+                    <section>
+                        <h2 class="text-lg font-semibold mb-3">風格</h2>
+                        <div id="theme-selector" class="grid grid-cols-5 md:grid-cols-10 gap-2">
+                            <!-- 主題按鈕將動態載入 -->
+                        </div>
+                    </section>
+                    
+                    <!-- 匯出美觀格式 -->
+                    <section>
+                        <h2 class="text-lg font-semibold mb-3">匯出美觀格式</h2>
+                        <div class="flex space-x-2">
+                            <button id="export-txt-btn" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"><i class="fas fa-file-alt mr-2"></i>匯出 TXT</button>
+                            <button id="export-pdf-btn" class="flex-1 bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"><i class="fas fa-file-pdf mr-2"></i>匯出 PDF</button>
+                            <!-- <button class="flex-1 bg-gray-300 text-gray-500 py-2 px-4 rounded-lg font-medium cursor-not-allowed" disabled><i class="fas fa-file-word mr-2"></i>匯出 DOCX</button> -->
+                        </div>
+                        <p class="text-xs text-secondary mt-2">PDF 匯出可能需要幾秒鐘時間。DOCX 匯出在純客戶端較難實現，故暫不提供。</p>
+                    </section>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- 
+          底部導覽列
+          sticky bottom-0 讓它固定在底部
+          shadow-t-lg 頂部陰影
+        -->
+        <nav class="w-full bg-primary border-t border-color shadow-custom flex justify-around sticky bottom-0">
+            <button onclick="showPage('add')" class="nav-btn flex-1 text-center py-3 px-2 text-primary-color" data-page="add">
+                <i class="fas fa-plus-circle text-xl"></i>
+                <span class="block text-xs font-medium">新增</span>
+            </button>
+            <button onclick="showPage('records')" class="nav-btn flex-1 text-center py-3 px-2 text-secondary" data-page="records">
+                <i class="fas fa-book text-xl"></i>
+                <span class="block text-xs font-medium">記錄</span>
+            </button>
+            <button onclick="showPage('more')" class="nav-btn flex-1 text-center py-3 px-2 text-secondary" data-page="more">
+                <i class="fas fa-ellipsis-h text-xl"></i>
+                <span class="block text-xs font-medium">更多</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- 
+      編輯 Modal (彈窗)
+      預設隱藏 (hidden)
+    -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-primary p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-primary-color">編輯記錄</h2>
+                <button id="close-modal-btn" class="text-secondary hover:text-primary-color">&times;</button>
+            </div>
+            
+            <form id="edit-form" class="space-y-4 overflow-y-auto no-scrollbar flex-grow">
+                <input type="hidden" id="edit-log-id">
+                <div>
+                    <label for="edit-log-date" class="block text-sm font-medium text-secondary">時間</label>
+                    <input type="date" id="edit-log-date" name="edit-log-date" required class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                </div>
+                <div>
+                    <label for="edit-log-location" class="block text-sm font-medium text-secondary">地點 (選填)</label>
+                    <input type="text" id="edit-log-location" name="edit-log-location" class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                </div>
+                <div>
+                    <label for="edit-log-topic" class="block text-sm font-medium text-secondary">主題</label>
+                    <input type="text" id="edit-log-topic" name="edit-log-topic" required class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                </div>
+                <div>
+                    <label for="edit-log-content" class="block text-sm font-medium text-secondary">內容</label>
+                    <textarea id="edit-log-content" name="edit-log-content" rows="5" required class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"></textarea>
+                </div>
+                <div>
+                    <label for="edit-log-category-select" class="block text-sm font-medium text-secondary">分類</label>
+                    <select id="edit-log-category-select" name="edit-log-category-select" class="mt-1 block w-full px-3 py-2 bg-primary border border-color rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                        <!-- 分類選項將動態載入 -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-secondary">已儲存的附件</label>
+                    <div id="edit-attachments-list" class="text-sm text-secondary mt-2 space-y-1">
+                        <!-- 附件列表 -->
+                    </div>
+                </div>
+            </form>
+            
+            <div class="mt-6 flex flex-col md:flex-row-reverse gap-2">
+                <button type="submit" form="edit-form" class="w-full md:w-auto bg-primary-color text-primary-color-text py-2 px-4 rounded-lg font-semibold shadow-custom hover-bg-primary-hover transition-colors">
+                    <i class="fas fa-save mr-2"></i>儲存變更
+                </button>
+                <button id="delete-log-btn" class="w-full md:w-auto bg-red-600 text-white py-2 px-4 rounded-lg font-semibold shadow-custom hover:bg-red-700 transition-colors">
+                    <i class="fas fa-trash-alt mr-2"></i>刪除記錄
+                </button>
+                <button id="cancel-edit-btn" class="w-full md:w-auto bg-secondary text-primary py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors md:mr-auto">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 訊息提示 Modal -->
+    <div id="message-modal" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white py-3 px-6 rounded-lg shadow-xl opacity-0 transition-opacity duration-300 z-50">
+        <span id="message-content"></span>
+    </div>
+    
+    <!-- PDF 匯出渲染區 (隱藏) -->
+    <div id="pdf-render-area"></div>
+
+
+    <script type="module">
+        // --- PWA 服務工作線程 (Service Worker) 註冊 ---
+        if ('serviceWorker' in navigator) {
+            // 我們將 SW 邏輯建立為一個字串，然後製作一個 Blob URL 來註冊它
+            // 這讓我們可以保持單一檔案，同時擁有 SW
+            const swContent = `
+                const CACHE_NAME = 'learning-log-cache-v1';
+                const URLS_TO_CACHE = [
+                    '/', // 這將會快取這個 HTML 檔案本身
+                    'https://cdn.tailwindcss.com/',
+                    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+                    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+                ];
+
+                self.addEventListener('install', event => {
+                    event.waitUntil(
+                        caches.open(CACHE_NAME)
+                            .then(cache => {
+                                console.log('Opened cache');
+                                return cache.addAll(URLS_TO_CACHE);
+                            })
+                    );
+                });
+
+                self.addEventListener('fetch', event => {
+                    event.respondWith(
+                        caches.match(event.request)
+                            .then(response => {
+                                // Cache hit - return response
+                                if (response) {
+                                    return response;
+                                }
+                                return fetch(event.request);
+                            }
+                        )
+                    );
+                });
+
+                self.addEventListener('activate', event => {
+                    const cacheWhitelist = [CACHE_NAME];
+                    event.waitUntil(
+                        caches.keys().then(cacheNames => {
+                            return Promise.all(
+                                cacheNames.map(cacheName => {
+                                    if (cacheWhitelist.indexOf(cacheName) === -1) {
+                                        return caches.delete(cacheName);
+                                    }
+                                })
+                            );
+                        })
+                    );
+                });
+            `;
+            const swBlob = new Blob([swContent], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(swBlob);
+            
+            navigator.serviceWorker.register(swUrl)
+                .then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                })
+                .catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+        }
+
+        // --- 資料庫 (IndexedDB) ---
+        const DB_NAME = 'LearningLogDB';
+        const LOGS_STORE = 'logs';
+        const CATEGORIES_STORE = 'categories';
+        let db;
+        
+        // --- 狀態 ---
+        let currentViewFormat = 'list'; // 'list', 'timeline', 'category'
+        let currentEditingId = null;
+
+        // --- DOM 元素 ---
+        const pageAdd = document.getElementById('page-add');
+        const pageRecords = document.getElementById('page-records');
+        const pageMore = document.getElementById('page-more');
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const recordsList = document.getElementById('records-list');
+        const addForm = document.getElementById('add-form');
+        const editModal = document.getElementById('edit-modal');
+        const editForm = document.getElementById('edit-form');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const deleteLogBtn = document.getElementById('delete-log-btn');
+        const categorySelect = document.getElementById('log-category-select');
+        const editCategorySelect = document.getElementById('edit-log-category-select');
+        const newCategoryInput = document.getElementById('log-category-new');
+        const categoryManagerList = document.getElementById('category-manager-list');
+        const themeSelector = document.getElementById('theme-selector');
+        const viewFormatButtons = document.querySelectorAll('.view-format-btn');
+        const exportDataBtn = document.getElementById('export-data-btn');
+        const importDataBtn = document.getElementById('import-data-btn');
+        const importFileInput = document.getElementById('import-file-input');
+        const importOptions = document.getElementById('import-options');
+        const exportTxtBtn = document.getElementById('export-txt-btn');
+        const exportPdfBtn = document.getElementById('export-pdf-btn');
+        const refreshRecordsBtn = document.getElementById('refresh-records');
+        
+        // --- 訊息提示 ---
+        const messageModal = document.getElementById('message-modal');
+        const messageContent = document.getElementById('message-content');
+        
+        function showMessage(message) {
+            messageContent.textContent = message;
+            messageModal.classList.remove('opacity-0');
+            setTimeout(() => {
+                messageModal.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // --- 頁面切換 ---
+        window.showPage = (pageId) => {
+            // 隱藏所有頁面
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            // 顯示目標頁面
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            
+            // 更新導覽列按鈕樣式
+            navButtons.forEach(btn => {
+                if (btn.dataset.page === pageId) {
+                    btn.classList.add('text-primary-color');
+                    btn.classList.remove('text-secondary');
+                } else {
+                    btn.classList.remove('text-primary-color');
+                    btn.classList.add('text-secondary');
+                }
+            });
+            
+            // 如果切換到記錄頁，重新載入
+            if (pageId === 'records') {
+                loadLogs();
+            }
+        };
+
+        // --- 資料庫初始化 ---
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    // 建立 logs 物件儲存 (logs object store)
+                    if (!db.objectStoreNames.contains(LOGS_STORE)) {
+                        db.createObjectStore(LOGS_STORE, { keyPath: 'id', autoIncrement: true });
+                    }
+                    // 建立 categories 物件儲存 (categories object store)
+                    if (!db.objectStoreNames.contains(CATEGORIES_STORE)) {
+                        db.createObjectStore(CATEGORIES_STORE, { keyPath: 'name' });
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    console.log('Database initialized');
+                    resolve(db);
+                };
+
+                request.onerror = (event) => {
+                    console.error('Database error:', event.target.errorCode);
+                    reject(event.target.errorCode);
+                };
+            });
+        }
+        
+        // --- 分類處理 ---
+        async function loadCategories() {
+            if (!db) return;
+            const transaction = db.transaction([CATEGORIES_STORE], 'readonly');
+            const store = transaction.objectStore(CATEGORIES_STORE);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                const categories = event.target.result;
+                
+                // 清空下拉選單
+                categorySelect.innerHTML = '<option value="">-- 選擇分類 --</option>';
+                editCategorySelect.innerHTML = '<option value="">-- 選擇分類 --</option>';
+                categoryManagerList.innerHTML = '';
+                
+                if (categories.length === 0) {
+                    categoryManagerList.innerHTML = '<p class="text-sm text-secondary">尚無分類</p>';
+                }
+
+                categories.forEach(category => {
+                    // 加入到新增頁的下拉選單
+                    const option = document.createElement('option');
+                    option.value = category.name;
+                    option.textContent = category.name;
+                    categorySelect.appendChild(option);
+                    
+                    // 加入到編輯頁的下拉選單
+                    const editOption = document.createElement('option');
+                    editOption.value = category.name;
+                    editOption.textContent = category.name;
+                    editCategorySelect.appendChild(editOption.cloneNode(true));
+                    
+                    // 加入到分類管理列表
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center bg-secondary p-2 rounded-lg';
+                    div.innerHTML = `
+                        <span class="text-primary">${category.name}</span>
+                        <button class="text-red-500 hover:text-red-700" data-name="${category.name}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    `;
+                    div.querySelector('button').onclick = () => deleteCategory(category.name);
+                    categoryManagerList.appendChild(div);
+                });
+            };
+        }
+        
+        async function addCategory(name) {
+            if (!db || !name.trim()) return;
+            
+            const transaction = db.transaction([CATEGORIES_STORE], 'readwrite');
+            const store = transaction.objectStore(CATEGORIES_STORE);
+            
+            // 檢查是否已存在
+            const getRequest = store.get(name);
+            getRequest.onsuccess = () => {
+                if (!getRequest.result) {
+                    // 不存在，則新增
+                    const addRequest = store.add({ name: name });
+                    addRequest.onsuccess = () => {
+                        console.log('Category added');
+                        loadCategories(); // 重新載入分類
+                    };
+                    addRequest.onerror = (e) => console.error('Error adding category:', e.target.error);
+                }
+            };
+        }
+        
+        async function deleteCategory(name) {
+            if (!db) return;
+            if (!confirm(`確定要刪除分類 "${name}" 嗎？\n(注意：這不會刪除該分類的記錄，但記錄的分類會被清除)`)) return;
+
+            const transaction = db.transaction([CATEGORIES_STORE, LOGS_STORE], 'readwrite');
+            const catStore = transaction.objectStore(CATEGORIES_STORE);
+            
+            const deleteRequest = catStore.delete(name);
+            deleteRequest.onsuccess = () => {
+                console.log('Category deleted');
+                showMessage('分類已刪除');
+                loadCategories();
+                
+                // 更新所有相關記錄的分類
+                const logStore = transaction.objectStore(LOGS_STORE);
+                const logRequest = logStore.openCursor();
+                logRequest.onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if (cursor) {
+                        if (cursor.value.category === name) {
+                            const updateData = cursor.value;
+                            updateData.category = ''; // 清除分類
+                            cursor.update(updateData);
+                        }
+                        cursor.continue();
+                    } else {
+                        loadLogs(); // 刪除分類後重新載入記錄
+                    }
+                };
+            };
+            deleteRequest.onerror = (e) => console.error('Error deleting category:', e.target.error);
+        }
+
+        // --- 記錄處理 (Logs) ---
+        
+        // 檔案轉為可儲存的格式 (Blob)
+        // 由於 IndexedDB 可以直接儲存 File 物件 (因為它們是 Blob)，我們甚至不需要 FileReader
+        
+        // 新增記錄
+        addForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            let category = categorySelect.value;
+            const newCategory = newCategoryInput.value.trim();
+            
+            if (newCategory) {
+                category = newCategory;
+                await addCategory(newCategory); // 等待分類新增完成
+                newCategoryInput.value = ''; // 清空
+            }
+            
+            const attachmentsInput = document.getElementById('log-attachments');
+            const files = Array.from(attachmentsInput.files); // 取得 File 物件陣列
+
+            const logData = {
+                id: Date.now(), // 使用時間戳作為 ID
+                date: document.getElementById('log-date').value,
+                location: document.getElementById('log-location').value,
+                topic: document.getElementById('log-topic').value,
+                content: document.getElementById('log-content').value,
+                category: category,
+                attachments: files // 直接儲存 File 物件
+            };
+
+            const transaction = db.transaction([LOGS_STORE], 'readwrite');
+            const store = transaction.objectStore(LOGS_STORE);
+            const request = store.add(logData);
+
+            request.onsuccess = () => {
+                showMessage('新增成功！');
+                addForm.reset();
+                document.getElementById('log-date').value = new Date().toISOString().split('T')[0]; // 重設日期為今天
+                loadCategories(); // 確保新分類被選中
+                showPage('records'); // 切換到記錄頁
+            };
+
+            request.onerror = (event) => {
+                console.error('Error adding log:', event.target.error);
+                showMessage('新增失敗，請檢查主控台');
+            };
+        });
+
+        // 載入並顯示記錄
+        async function loadLogs() {
+            if (!db) return;
+            
+            const transaction = db.transaction([LOGS_STORE], 'readonly');
+            const store = transaction.objectStore(LOGS_STORE);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                let logs = event.target.result;
+                // 預設按日期倒序
+                logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                renderLogs(logs);
+            };
+        }
+        
+        // 渲染記錄 (根據檢視模式)
+        function renderLogs(logs) {
+            recordsList.innerHTML = ''; // 清空
+            
+            if (logs.length === 0) {
+                recordsList.innerHTML = '<p class="text-secondary">目前沒有記錄。</p>';
+                return;
+            }
+
+            if (currentViewFormat === 'list') {
+                renderLogsAsList(logs);
+            } else if (currentViewFormat === 'timeline') {
+                renderLogsAsTimeline(logs);
+            } else if (currentViewFormat === 'category') {
+                renderLogsByCategory(logs);
+            }
+        }
+        
+        function createLogCard(log) {
+            const card = document.createElement('div');
+            card.className = 'bg-primary p-4 rounded-lg shadow-custom cursor-pointer border border-color hover:shadow-lg transition-shadow';
+            card.onclick = () => openEditModal(log.id);
+            
+            let attachmentInfo = '';
+            if (log.attachments && log.attachments.length > 0) {
+                attachmentInfo = `<div class="mt-2 text-sm text-secondary"><i class="fas fa-paperclip mr-1"></i> ${log.attachments.length} 個附件</div>`;
+            }
+            
+            let categoryInfo = '';
+            if (log.category) {
+                categoryInfo = `<span class="text-xs font-semibold bg-primary-color bg-opacity-10 text-primary-color py-1 px-2 rounded-full">${log.category}</span>`;
+            }
+            
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <h3 class="text-lg font-semibold text-primary mb-1">${log.topic}</h3>
+                    ${categoryInfo}
+                </div>
+                <p class="text-sm text-secondary mb-2">${log.date} ${log.location ? ' | ' + log.location : ''}</p>
+                <p class="text-primary text-sm line-clamp-2">${log.content}</p>
+                ${attachmentInfo}
+            `;
+            return card;
+        }
+
+        function renderLogsAsList(logs) {
+            recordsList.className = 'space-y-4';
+            logs.forEach(log => {
+                recordsList.appendChild(createLogCard(log));
+            });
+        }
+        
+        function renderLogsAsTimeline(logs) {
+            recordsList.className = 'relative'; // 為了時間軸的 positioning
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'timeline-item';
+                
+                const dot = document.createElement('div');
+                dot.className = 'timeline-dot';
+                item.appendChild(dot);
+                
+                item.appendChild(createLogCard(log));
+                recordsList.appendChild(item);
+            });
+        }
+        
+        function renderLogsByCategory(logs) {
+            recordsList.className = 'space-y-6';
+            
+            const grouped = logs.reduce((acc, log) => {
+                const key = log.category || '未分類';
+                if (!acc[key]) {
+                    acc[key] = [];
+                }
+                acc[key].push(log);
+                return acc;
+            }, {});
+
+            Object.keys(grouped).sort().forEach(categoryName => {
+                const section = document.createElement('section');
+                section.innerHTML = `<h2 class="text-xl font-bold text-primary-color mb-3 pb-1 border-b-2 border-color">${categoryName}</h2>`;
+                const categoryList = document.createElement('div');
+                categoryList.className = 'space-y-4';
+                
+                grouped[categoryName].forEach(log => {
+                    categoryList.appendChild(createLogCard(log));
+                });
+                
+                section.appendChild(categoryList);
+                recordsList.appendChild(section);
+            });
+        }
+        
+        // 開啟編輯 Modal
+        window.openEditModal = (id) => {
+            const transaction = db.transaction([LOGS_STORE], 'readonly');
+            const store = transaction.objectStore(LOGS_STORE);
+            const request = store.get(id);
+
+            request.onsuccess = (event) => {
+                const log = event.target.result;
+                if (!log) return;
+                
+                currentEditingId = log.id;
+                document.getElementById('edit-log-id').value = log.id;
+                document.getElementById('edit-log-date').value = log.date;
+                document.getElementById('edit-log-location').value = log.location;
+                document.getElementById('edit-log-topic').value = log.topic;
+                document.getElementById('edit-log-content').value = log.content;
+                document.getElementById('edit-log-category-select').value = log.category;
+                
+                // 顯示附件
+                const attachmentsList = document.getElementById('edit-attachments-list');
+                attachmentsList.innerHTML = '';
+                if (log.attachments && log.attachments.length > 0) {
+                    log.attachments.forEach(file => {
+                        // 建立一個可點擊下載的連結
+                        const fileUrl = URL.createObjectURL(file);
+                        const link = document.createElement('a');
+                        link.href = fileUrl;
+                        link.download = file.name;
+                        link.className = "block text-primary-color hover:underline";
+                        link.textContent = file.name;
+                        attachmentsList.appendChild(link);
+                    });
+                } else {
+                    attachmentsList.textContent = '沒有附件';
+                }
+
+                editModal.classList.remove('hidden');
+            };
+        };
+        
+        // 關閉 Modal
+        function closeEditModal() {
+            currentEditingId = null;
+            editModal.classList.add('hidden');
+            editForm.reset();
+        }
+        closeModalBtn.onclick = closeEditModal;
+        cancelEditBtn.onclick = closeEditModal;
+        
+        // 儲存編輯
+        editForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            
+            const id = parseInt(currentEditingId); // IDb 儲存的是數字
+            
+            // 我們需要重新取得原始的附件，因為表單上沒有上傳新附件的選項
+            const getTransaction = db.transaction([LOGS_STORE], 'readonly');
+            const getStore = getTransaction.objectStore(LOGS_STORE);
+            const getRequest = getStore.get(id);
+
+            getRequest.onsuccess = (e) => {
+                const originalLog = e.target.result;
+                
+                const updatedLog = {
+                    id: id,
+                    date: document.getElementById('edit-log-date').value,
+                    location: document.getElementById('edit-log-location').value,
+                    topic: document.getElementById('edit-log-topic').value,
+                    content: document.getElementById('edit-log-content').value,
+                    category: document.getElementById('edit-log-category-select').value,
+                    attachments: originalLog.attachments // 保留原始附件
+                };
+
+                const putTransaction = db.transaction([LOGS_STORE], 'readwrite');
+                const putStore = putTransaction.objectStore(LOGS_STORE);
+                const putRequest = putStore.put(updatedLog);
+
+                putRequest.onsuccess = () => {
+                    showMessage('儲存成功！');
+                    closeEditModal();
+                    loadLogs();
+                };
+                putRequest.onerror = (e) => console.error('Error updating log:', e.target.error);
+            };
+        });
+
+        // 刪除記錄
+        deleteLogBtn.onclick = () => {
+            if (!confirm('您確定要永久刪除這筆記錄嗎？')) return;
+            
+            const id = parseInt(currentEditingId);
+            const transaction = db.transaction([LOGS_STORE], 'readwrite');
+            const store = transaction.objectStore(LOGS_STORE);
+            const request = store.delete(id);
+            
+            request.onsuccess = () => {
+                showMessage('刪除成功！');
+                closeEditModal();
+                loadLogs();
+            };
+            request.onerror = (e) => console.error('Error deleting log:', e.target.error);
+        };
+        
+        // 刷新按鈕
+        refreshRecordsBtn.onclick = () => {
+            showMessage('重新整理記錄...');
+            loadLogs();
+        };
+
+        // --- 更多頁面功能 ---
+        
+        // 檢視格式
+        viewFormatButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentViewFormat = btn.dataset.format;
+                
+                // 更新按鈕樣式
+                viewFormatButtons.forEach(b => b.classList.remove('active', 'bg-primary-color', 'text-primary-color-text'));
+                btn.classList.add('active', 'bg-primary-color', 'text-primary-color-text');
+                
+                loadLogs(); // 重新渲染
+            });
+        });
+        // 預設選中 'list'
+        document.querySelector('.view-format-btn[data-format="list"]').classList.add('active', 'bg-primary-color', 'text-primary-color-text');
+        
+        
+        // --- 主題切換 ---
+        const themes = {
+            'default': { name: '預設藍', colors: { '--bg-primary': '#ffffff', '--bg-secondary': '#f3f4f6', '--text-primary': '#1f2937', '--text-secondary': '#6b7280', '--color-primary': '#3b82f6', '--color-primary-hover': '#2563eb', '--color-primary-text': '#ffffff', '--border-color': '#d1d5db', '--shadow-color': 'rgba(0, 0, 0, 0.1)' } },
+            'dark': { name: '深邃黑', colors: { '--bg-primary': '#1f2937', '--bg-secondary': '#111827', '--text-primary': '#f9fafb', '--text-secondary': '#d1d5db', '--color-primary': '#60a5fa', '--color-primary-hover': '#3b82f6', '--color-primary-text': '#111827', '--border-color': '#4b5563', '--shadow-color': 'rgba(255, 255, 255, 0.1)' } },
+            'forest': { name: '森林綠', colors: { '--bg-primary': '#f0fdf4', '--bg-secondary': '#dcfce7', '--text-primary': '#14532d', '--text-secondary': '#166534', '--color-primary': '#22c55e', '--color-primary-hover': '#16a34a', '--color-primary-text': '#ffffff', '--border-color': '#bbf7d0', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'rose': { name: '玫瑰紅', colors: { '--bg-primary': '#fff1f2', '--bg-secondary': '#ffe4e6', '--text-primary': '#881337', '--text-secondary': '#9f1239', '--color-primary': '#f43f5e', '--color-primary-hover': '#e11d48', '--color-primary-text': '#ffffff', '--border-color': '#fecdd3', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'amber': { name: '琥珀黃', colors: { '--bg-primary': '#fffbeb', '--bg-secondary': '#fef3c7', '--text-primary': '#78350f', '--text-secondary': '#92400e', '--color-primary': '#f59e0b', '--color-primary-hover': '#d97706', '--color-primary-text': '#ffffff', '--border-color': '#fde68a', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'violet': { name: '紫羅蘭', colors: { '--bg-primary': '#f5f3ff', '--bg-secondary': '#ede9fe', '--text-primary': '#4c1d95', '--text-secondary': '#5b21b6', '--color-primary': '#7c3aed', '--color-primary-hover': '#6d28d9', '--color-primary-text': '#ffffff', '--border-color': '#ddd6fe', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'ocean': { name: '海洋藍', colors: { '--bg-primary': '#f0f9ff', '--bg-secondary': '#e0f2fe', '--text-primary': '#0369a1', '--text-secondary': '#075985', '--color-primary': '#0ea5e9', '--color-primary-hover': '#0284c7', '--color-primary-text': '#ffffff', '--border-color': '#bae6fd', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'mint': { name: '薄荷', colors: { '--bg-primary': '#ecfdf5', '--bg-secondary': '#d1fae5', '--text-primary': '#065f46', '--text-secondary': '#047857', '--color-primary': '#10b981', '--color-primary-hover': '#059669', '--color-primary-text': '#ffffff', '--border-color': '#a7f3d0', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'coral': { name: '珊瑚', colors: { '--bg-primary': '#fff4f2', '--bg-secondary': '#ffede9', '--text-primary': '#7f2709', '--text-secondary': '#9a3412', '--color-primary': '#f97316', '--color-primary-hover': '#ea580c', '--color-primary-text': '#ffffff', '--border-color': '#fed7aa', '--shadow-color': 'rgba(0, 0, 0, 0.05)' } },
+            'slate': { name: '石板灰', colors: { '--bg-primary': '#f8fafc', '--bg-secondary': '#f1f5f9', '--text-primary': '#334155', '--text-secondary': '#475569', '--color-primary': '#64748b', '--color-primary-hover': '#475569', '--color-primary-text': '#ffffff', '--border-color': '#e2e8f0', '--shadow-color': 'rgba(0, 0, 0, 0.1)' } }
+        };
+
+        function applyTheme(themeName) {
+            const theme = themes[themeName];
+            if (!theme) return;
+            
+            Object.entries(theme.colors).forEach(([key, value]) => {
+                document.documentElement.style.setProperty(key, value);
+            });
+            
+            localStorage.setItem('learning-log-theme', themeName); // 保存主題
+        }
+        
+        // 載入主題按鈕
+        Object.entries(themes).forEach(([key, theme]) => {
+            const btn = document.createElement('button');
+            btn.className = 'w-10 h-10 rounded-full border-2 border-color focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)]';
+            btn.title = theme.name;
+            btn.style.backgroundColor = theme.colors['--color-primary'];
+            btn.onclick = () => applyTheme(key);
+            themeSelector.appendChild(btn);
+        });
+
+        // 載入上次儲存的主題
+        const savedTheme = localStorage.getItem('learning-log-theme') || 'default';
+        applyTheme(savedTheme);
+        
+        // --- 匯入 / 匯出 ---
+        
+        // 匯出
+        exportDataBtn.onclick = async () => {
+            if (!db) return;
+            showMessage('正在準備匯出...');
+            
+            const logs = await getAllFromStore(LOGS_STORE);
+            const categories = await getAllFromStore(CATEGORIES_STORE);
+            
+            // 由於 File/Blob 物件無法被 JSON.stringify，我們需要將它們轉為 base64
+            const logsToExport = [];
+            for (const log of logs) {
+                const attachmentsBase64 = [];
+                if (log.attachments) {
+                    for (const file of log.attachments) {
+                        attachmentsBase64.push({
+                            name: file.name,
+                            type: file.type,
+                            data: await fileToDataURL(file) // 轉為 Data URL (base64)
+                        });
+                    }
+                }
+                logsToExport.push({ ...log, attachments: attachmentsBase64 });
+            }
+
+            const data = {
+                logs: logsToExport,
+                categories: categories
+            };
+            
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `learning_log_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showMessage('匯出成功！');
+        };
+        
+        // 匯入
+        importDataBtn.onclick = () => {
+            importOptions.classList.toggle('hidden');
+            importFileInput.click();
+        };
+        
+        importFileInput.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+                    
+                    showMessage('正在匯入...');
+                    
+                    const logStore = db.transaction([LOGS_STORE], 'readwrite').objectStore(LOGS_STORE);
+                    const catStore = db.transaction([CATEGORIES_STORE], 'readwrite').objectStore(CATEGORIES_STORE);
+
+                    if (mode === 'overwrite') {
+                        await logStore.clear();
+                        await catStore.clear();
+                    }
+                    
+                    // 匯入分類
+                    if (data.categories) {
+                        for (const category of data.categories) {
+                            await catStore.put(category);
+                        }
+                    }
+                    
+                    // 匯入記錄 (並將 base64 轉回 File/Blob)
+                    if (data.logs) {
+                        for (const log of data.logs) {
+                            const attachmentsFiles = [];
+                            if (log.attachments) {
+                                for (const fileData of log.attachments) {
+                                    attachmentsFiles.push(dataURLtoFile(fileData.data, fileData.name, fileData.type));
+                                }
+                            }
+                            await logStore.put({ ...log, attachments: attachmentsFiles });
+                        }
+                    }
+                    
+                    showMessage('匯入成功！');
+                    loadCategories();
+                    loadLogs();
+                    importOptions.classList.add('hidden');
+                    
+                } catch (err) {
+                    console.error('Import failed:', err);
+                    showMessage('匯入失敗，檔案格式錯誤');
+                }
+            };
+            reader.readAsText(file);
+            importFileInput.value = ''; // 重置
+        };
+        
+        // --- 輔助函式 (匯入/匯出) ---
+        function getAllFromStore(storeName) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.getAll();
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+        
+        function fileToDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        function dataURLtoFile(dataurl, filename, type) {
+            const arr = dataurl.split(',');
+            const mime = type;
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--){
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new File([u8arr], filename, {type:mime});
+        }
+        
+        // --- 匯出美觀格式 ---
+        
+        async function getFormattedLogs() {
+            const logs = await getAllFromStore(LOGS_STORE);
+            logs.sort((a, b) => new Date(b.date) - new Date(a.date)); // 確保排序
+            return logs;
+        }
+
+        // 匯出 TXT
+        exportTxtBtn.onclick = async () => {
+            showMessage('正在產生 TXT...');
+            const logs = await getFormattedLogs();
+            let txtContent = "學習歷程記錄\n===================\n\n";
+            
+            logs.forEach(log => {
+                txtContent += `----------------------------------------\n`;
+                txtContent += `主題： ${log.topic}\n`;
+                txtContent += `日期： ${log.date}\n`;
+                if (log.location) txtContent += `地點： ${log.location}\n`;
+                if (log.category) txtContent += `分類： ${log.category}\n`;
+                txtContent += `\n內容：\n${log.content}\n\n`;
+                if (log.attachments && log.attachments.length > 0) {
+                    txtContent += `附件： ${log.attachments.map(f => f.name).join(', ')}\n`;
+                }
+                txtContent += `----------------------------------------\n\n`;
+            });
+            
+            const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'learning_log.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+        
+        // 匯出 PDF
+        exportPdfBtn.onclick = async () => {
+            showMessage('正在產生 PDF... 請稍候');
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const renderArea = document.getElementById('pdf-render-area');
+            
+            // 為了讓 html2canvas 正確渲染中文，我們需要一個已經載入中文字型的環境。
+            // 幸運的是，我們正在渲染的頁面 (renderArea) 就在當前文件中，
+            // 它會使用與主頁面相同的字型。
+            
+            // 建立美觀的 HTML 內容以供渲染
+            const logs = await getFormattedLogs();
+            let htmlContent = `<h1 style="font-size: 24px; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;">學習歷程記錄</h1>`;
+            
+            logs.forEach(log => {
+                htmlContent += `
+                    <div style="margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 5px; page-break-inside: avoid;">
+                        <h2 style="font-size: 18px; font-weight: bold; color: #3b82f6;">${log.topic}</h2>
+                        <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                            <strong>日期:</strong> ${log.date} | 
+                            ${log.location ? `<strong>地點:</strong> ${log.location} | ` : ''}
+                            ${log.category ? `<strong>分類:</strong> ${log.category}` : ''}
+                        </p>
+                        <div style="font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">${log.content.replace(/\n/g, '<br>')}</div>
+                        ${log.attachments && log.attachments.length > 0 ? `<p style="font-size: 13px; color: #888; margin-top: 10px;"><strong>附件:</strong> ${log.attachments.map(f => f.name).join(', ')}</p>` : ''}
+                    </div>
+                `;
+            });
+            
+            renderArea.innerHTML = htmlContent;
+            
+            try {
+                const canvas = await html2canvas(renderArea, {
+                    scale: 2, // 提高解析度
+                    useCORS: true
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 190; // A4 寬度 (210mm) 減去邊距
+                const pageHeight = 297; // A4 高度
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 10; // 頂部邊距
+
+                doc.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight + 10; // 調整下一頁的位置
+                    doc.addPage();
+                    doc.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                doc.save('learning_log.pdf');
+                showMessage('PDF 匯出成功！');
+            } catch (error) {
+                console.error('PDF export error:', error);
+                showMessage('PDF 匯出失敗');
+            } finally {
+                renderArea.innerHTML = ''; // 清空
+            }
+        };
+
+        // --- 應用程式啟動 ---
+        window.onload = async () => {
+            showMessage('正在初始化資料庫...');
+            try {
+                await initDB();
+                await loadCategories();
+                await loadLogs();
+                // 設定今天日期
+                document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
+                showMessage('歡迎使用！');
+            } catch (error) {
+                console.error(error);
+                showMessage('資料庫初始化失敗！');
+            }
+        };
+
+    </script>
+</body>
+</html>
+
